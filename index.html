@@ -6,10 +6,10 @@
 <meta name="theme-color" content="#0d5f73">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<meta name="apple-mobile-web-app-title" content="Cylinder Log">
+<meta name="apple-mobile-web-app-title" content="Airgas Orders">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
-<title>Gas Cylinder Log</title>
+<title>Airgas Orders</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Condensed:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
 <style>
@@ -174,12 +174,12 @@ textarea { resize: vertical; min-height: 64px; }
 <div class="wrap">
   <header class="top">
     <div>
-      <div class="eyebrow">Compressed gas · orders, stock &amp; returns</div>
-      <h1>Gas Cylinder Log</h1>
+      <div class="eyebrow">FAMES · CREATE · DENG — orders, stock &amp; returns</div>
+      <h1>Airgas Orders</h1>
     </div>
     <div class="top-actions">
       <button id="backupBtn" type="button">Back up</button><button id="restoreBtn" type="button">Restore</button><input id="restoreFile" type="file" accept=".json,application/json" hidden><button id="exportBtn" type="button" hidden>Export CSV</button>
-      <button id="newOrderBtn" class="primary" type="button">+ New order</button>
+      <button id="addExistingBtn" type="button">+ Add existing cylinder</button><button id="newOrderBtn" class="primary" type="button">+ New order</button>
     </div>
   </header>
 
@@ -201,7 +201,7 @@ textarea { resize: vertical; min-height: 64px; }
   </section>
 
   <p class="note">Workflow: <b>On order</b> → <b>In stock</b> (received, serial logged) → <b>In use</b> (connected to a tool) → <b>Return requested</b> → <b>Returned</b> (picked up by supplier). Days on site counts from receipt, for tracking cylinder rental.</p>
-  <p class="note">Records are saved on this device only; they do not sync with other devices. Clearing browser or website data can erase them, so use <b>Back up</b> regularly and store the backup somewhere safe. To install on iPhone, open this app URL in Safari, tap Share, then <b>Add to Home Screen</b>.</p>
+  <p class="note">This copy runs offline. Records are saved in this browser on this device only; they do not sync with other devices. Clearing browser or website data can erase them, so use <b>Back up</b> regularly and store the backup somewhere safe. To install on iPhone, open this app URL in Safari, tap Share, then <b>Add to Home Screen</b>.</p>
 </div>
 
 <div id="overlay" class="overlay" hidden></div>
@@ -306,7 +306,7 @@ textarea { resize: vertical; min-height: 64px; }
     const el = $("ledger");
     if (!loaded) return;
     if (!rows.length) {
-      el.innerHTML = `<div class="empty"><h2>No cylinders logged${lab === "all" ? "" : " for " + esc(lab)} yet</h2><p>Start with <b>New order</b> when you place a gas order. Each cylinder then moves through receiving, use and return here. Already have cylinders in the lab? Add them as an order and mark them received.</p>${readOnly ? "" : `<button type="button" class="primary" data-a="new">+ New order</button>`}</div>`;
+      el.innerHTML = `<div class="empty"><h2>No cylinders logged${lab === "all" ? "" : " for " + esc(lab)} yet</h2><p>Start with <b>New order</b> when you place a gas order. Each cylinder then moves through receiving, use and return here. Already have cylinders in the lab? Use <b>Add existing cylinder</b> to enter them as in stock or in use.</p>${readOnly ? "" : `<button type="button" data-a="existing">+ Add existing cylinder</button> <button type="button" class="primary" data-a="new">+ New order</button>`}</div>`;
       $("count").textContent = ""; return;
     }
     const rank = { return_requested: 0, ordered: 1, in_stock: 2, in_use: 3, returned: 4 };
@@ -399,7 +399,7 @@ textarea { resize: vertical; min-height: 64px; }
     await db.doc("cylinders/" + id).update(body);
   }
 
-  /* ---------- actions ---------- */
+  /* ---------- actions ---------- */ function addExisting() { openPanel({title:"Add existing cylinder",lead:"For cylinders already in the lab. Add one at a time so each serial number is logged.",submit:"Add cylinder",fields:[{name:"lab",label:"Lab",type:"select",options:LABS,value:lab==="all"?LABS[0]:lab,full:true},{name:"state",label:"Current state",type:"select",options:["In stock · intact (full)","In stock · opened (partly used)","In use on a device"],value:"In stock · intact (full)",full:true},{name:"gas",label:"Gas",list:GASES,required:true},{name:"grade",label:"Grade / purity"},{name:"size",label:"Cylinder size",list:SIZES},{name:"serial",label:"Cylinder serial number",required:true},{name:"device",label:"Connected device (if in use)"},{name:"location",label:"Room / location"},{name:"supplier",label:"Supplier",value:"Airgas"},{name:"receivedAt",label:"Date it arrived (if known)",type:"date"},{name:"by",label:"Added by"},{name:"notes",label:"Notes",type:"textarea",full:true}],onSubmit:async(d)=>{const now=new Date().toISOString();const inUse=d.state==="In use on a device";const opened=inUse||d.state==="In stock · opened (partly used)";const status=inUse?"in_use":"in_stock";rememberName(d.by.trim());await db.collection("cylinders").add({lab:d.lab,gas:d.gas.trim(),grade:d.grade.trim(),size:d.size.trim(),serial:d.serial.trim(),supplier:d.supplier.trim(),po:"",location:d.location.trim(),device:d.device.trim(),status,opened,empty:false,receivedAt:d.receivedAt||"",inUseAt:inUse?today():"",requestedBy:d.by.trim(),notes:d.notes.trim(),createdAt:now,updatedAt:now,history:[{status,at:now,by:d.by.trim(),note:"Added existing cylinder"}]});toast("Existing cylinder added");}}); }
   function newOrder() {
     openPanel({
       title: "New gas order", lead: "Each cylinder in the order gets its own line so it can be received and returned on its own.",
@@ -524,14 +524,14 @@ textarea { resize: vertical; min-height: 64px; }
   }
 
   /* ---------- events ---------- */
-  $("newOrderBtn").addEventListener("click", newOrder);
+  $("addExistingBtn").addEventListener("click", addExisting); $("newOrderBtn").addEventListener("click", newOrder);
   $("exportBtn").addEventListener("click", exportCsv);
   $("search").addEventListener("input", (e) => { query = e.target.value.trim().toLowerCase(); renderLedger(); });
   $("labs").addEventListener("click", (e) => { const b = e.target.closest("[data-lab]"); if (!b) return; lab = b.dataset.lab; try { localStorage.setItem("cyl-lab", lab); } catch (er) {} render(); });
   $("gauges").addEventListener("click", (e) => { const b = e.target.closest("[data-f]"); if (!b) return; filter = (filter === b.dataset.f && b.dataset.f !== "active") ? "active" : b.dataset.f; render(); });
   document.addEventListener("click", (e) => {
     const b = e.target.closest("[data-a]"); if (!b) return;
-    if (b.dataset.a === "new") return newOrder();
+    if (b.dataset.a === "new") return newOrder(); if (b.dataset.a === "existing") return addExisting();
     const r = rows.find(x => x.id === b.dataset.id); if (!r) return;
     ({ receive, use: putInUse, request: requestReturn, returned: markReturned, unuse: backToStock, detail: details })[b.dataset.a]?.(r);
   });
