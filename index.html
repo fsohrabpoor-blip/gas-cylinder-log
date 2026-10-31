@@ -1,0 +1,589 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0d5f73">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Cylinder Log">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<title>Gas Cylinder Log</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Condensed:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: control-panel header with status gauges, then a working ledger of cylinders; actions live on each row. */
+:root {
+  --bg: #f2f4f5;
+  --surface: #ffffff;
+  --sunk: #e7ebed;
+  --fg: #172227;
+  --muted: #5b6a71;
+  --line: #d3dade;
+  --accent: #0d5f73;
+  --accent-fg: #ffffff;
+  --accent-soft: #d8ecf0;
+  --ordered: #6b5bd2;
+  --stock: #1f8a4c;
+  --use: #0d6fa8;
+  --req: #c26a00;
+  --done: #7c878c;
+  --danger: #b3261e;
+  --overlay: rgba(15, 25, 30, .45);
+  --display: "IBM Plex Sans Condensed", "Arial Narrow", system-ui, sans-serif;
+  --body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #11181b; --surface: #182226; --sunk: #1f2b30; --fg: #e3eaed; --muted: #93a4ab; --line: #2c3a40;
+    --accent: #4fb6cc; --accent-fg: #062026; --accent-soft: #163a43;
+    --ordered: #9d90f0; --stock: #4cc27f; --use: #4aa8e0; --req: #f0a447; --done: #8d999e; --danger: #f2827a;
+    --overlay: rgba(0, 0, 0, .6);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #11181b; --surface: #182226; --sunk: #1f2b30; --fg: #e3eaed; --muted: #93a4ab; --line: #2c3a40;
+  --accent: #4fb6cc; --accent-fg: #062026; --accent-soft: #163a43;
+  --ordered: #9d90f0; --stock: #4cc27f; --use: #4aa8e0; --req: #f0a447; --done: #8d999e; --danger: #f2827a;
+  --overlay: rgba(0, 0, 0, .6);
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { margin: 0; }
+[hidden] { display: none !important; }
+body { background: var(--bg); color: var(--fg); font-family: var(--body); font-size: 15px; line-height: 1.45; }
+.wrap { max-width: 1180px; margin: 0 auto; padding-block: 28px 64px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: grid; gap: 22px; }
+
+header.top { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 16px; }
+.eyebrow { font-family: var(--mono); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+h1 { font-family: var(--display); font-weight: 700; font-size: clamp(28px, 4.5vw, 40px); line-height: 1.05; margin: 4px 0 0; letter-spacing: -.01em; text-wrap: balance; }
+.top-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+
+button, .btn { font: 500 14px/1 var(--body); border-radius: 6px; border: 1px solid var(--line); background: var(--surface); color: var(--fg); padding: 10px 14px; cursor: pointer; white-space: nowrap; }
+button:hover { border-color: var(--muted); }
+button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+button.primary { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); font-weight: 600; }
+button.primary:hover { filter: brightness(1.08); }
+button.ghost { background: transparent; border-color: transparent; color: var(--muted); }
+button.ghost:hover { color: var(--fg); border-color: var(--line); }
+button.danger { color: var(--danger); }
+button.sm { padding: 7px 10px; font-size: 13px; }
+button:disabled { opacity: .5; cursor: not-allowed; }
+
+/* lab tabs */
+.labs { display: flex; gap: 0; border-bottom: 2px solid var(--line); overflow-x: auto; }
+.labtab { border: 0; border-radius: 0; background: transparent; padding: 10px 18px 12px; margin-bottom: -2px; border-bottom: 3px solid transparent; font-family: var(--display); font-size: 17px; font-weight: 600; color: var(--muted); display: inline-flex; gap: 8px; align-items: baseline; }
+.labtab:hover { color: var(--fg); border-color: var(--line); }
+.labtab[aria-pressed="true"] { color: var(--fg); border-bottom-color: var(--accent); }
+.labtab small { font-family: var(--mono); font-size: 12px; font-weight: 400; color: var(--muted); font-variant-numeric: tabular-nums; }
+.labtag { display: inline-block; font-family: var(--mono); font-size: 11px; letter-spacing: .04em; padding: 2px 6px; border-radius: 4px; background: var(--sunk); color: var(--muted); margin-left: 6px; vertical-align: 1px; }
+
+/* status gauges */
+.gauges { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.gauge { background: var(--surface); border: 0; border-radius: 0; padding: 14px 16px 16px; text-align: left; display: grid; gap: 6px; position: relative; white-space: normal; }
+.gauge::before { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 3px; background: var(--c); opacity: .9; }
+.gauge .n { font-family: var(--display); font-weight: 700; font-size: 32px; line-height: 1; font-variant-numeric: tabular-nums; }
+.gauge .l { font-size: 13px; color: var(--muted); }
+.gauge[aria-pressed="true"] { background: var(--sunk); }
+.gauge[aria-pressed="true"] .l { color: var(--fg); font-weight: 600; }
+.gauge:hover { background: var(--sunk); }
+
+/* stock by gas */
+.bygas { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.bygas .lbl { font-family: var(--mono); font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin-right: 4px; }
+.gaspill { display: inline-flex; align-items: center; gap: 7px; padding: 5px 10px 5px 8px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); font-size: 13px; }
+.gaspill b { font-variant-numeric: tabular-nums; }
+.gaspill.low { border-color: var(--req); }
+.gaspill.low b { color: var(--req); }
+
+.dot { width: 11px; height: 11px; border-radius: 50%; flex: none; background: var(--g, var(--muted)); box-shadow: inset 0 0 0 1px rgba(127,127,127,.35); }
+
+/* toolbar */
+.toolbar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.search { flex: 1 1 240px; min-width: 0; }
+input, select, textarea { font: 400 15px/1.3 var(--body); color: var(--fg); background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 9px 11px; width: 100%; }
+textarea { resize: vertical; min-height: 64px; }
+.count { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+
+/* ledger */
+.ledger { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.row { display: grid; grid-template-columns: minmax(0, 1.9fr) minmax(0, 1.1fr) minmax(0, 1.3fr) minmax(0, 1.25fr) minmax(0, 1.35fr) minmax(0, 1.1fr) auto; gap: 14px; align-items: center; padding: 13px 16px; border-top: 1px solid var(--line); }
+.row:first-child { border-top: 0; }
+.row.head { background: var(--sunk); font-family: var(--mono); font-size: 11.5px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); padding-block: 9px; }
+.cell { min-width: 0; }
+.gas { display: flex; gap: 10px; align-items: flex-start; }
+.gas .dot { margin-top: 5px; }
+.gas .name { font-weight: 600; }
+.sub { font-size: 13px; color: var(--muted); overflow-wrap: anywhere; }
+.mono { font-family: var(--mono); font-size: 13.5px; overflow-wrap: anywhere; }
+.status { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; color: var(--c); }
+.status::before { content: ""; width: 8px; height: 8px; border-radius: 2px; background: var(--c); }
+.cond { display: inline-block; font-size: 12.5px; font-weight: 600; padding: 3px 8px; border-radius: 999px; border: 1px solid currentColor; }
+.cond.intact { color: var(--stock); }
+.cond.use { color: var(--accent-fg); background: var(--use); border-color: var(--use); }
+.cond.opened { color: var(--req); }
+.cond.empty { color: var(--done); border-style: dashed; }
+.days { font-variant-numeric: tabular-nums; }
+.days.warn { color: var(--req); font-weight: 600; }
+.acts { display: flex; gap: 6px; justify-content: flex-end; flex-wrap: wrap; }
+.row .k { display: none; }
+
+.empty { padding: 48px 20px; text-align: center; display: grid; gap: 10px; justify-items: center; }
+.empty h2 { font-family: var(--display); font-size: 22px; margin: 0; }
+.empty p { margin: 0; color: var(--muted); max-width: 46ch; }
+.note { font-size: 13px; color: var(--muted); }
+.banner { padding: 10px 14px; border-radius: 6px; background: var(--accent-soft); font-size: 14px; }
+
+@media (max-width: 860px) {
+  .gauges { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .row.head { display: none; }
+  .row { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px 14px; }
+  .row .cell.gascell { grid-column: 1 / -1; }
+  .row .acts { grid-column: 1 / -1; justify-content: flex-start; }
+  .row .k { display: block; font-family: var(--mono); font-size: 10.5px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+}
+@media (max-width: 480px) { .gauges { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+/* panel */
+.overlay { position: fixed; inset: 0; background: var(--overlay); display: grid; place-items: center; padding: 16px; z-index: 50; }
+.panel { background: var(--surface); color: var(--fg); border-radius: 10px; width: min(560px, 100%); max-height: calc(100% - 32px); overflow: auto; padding: 22px; display: grid; gap: 16px; border: 1px solid var(--line); }
+.panel h2 { font-family: var(--display); font-size: 24px; margin: 0; }
+.panel .lead { margin: -8px 0 0; color: var(--muted); font-size: 14px; }
+.fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 14px; }
+.field { display: grid; gap: 5px; min-width: 0; }
+.field.full { grid-column: 1 / -1; }
+.field label { font-size: 13px; font-weight: 500; color: var(--muted); }
+.panel .foot { display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
+.err { color: var(--danger); font-size: 13px; }
+@media (max-width: 480px) { .fields { grid-template-columns: 1fr; } }
+
+.history { display: grid; gap: 0; border-left: 2px solid var(--line); margin-left: 4px; }
+.history div { padding: 4px 0 10px 14px; position: relative; font-size: 14px; }
+.history div::before { content: ""; position: absolute; left: -6px; top: 9px; width: 10px; height: 10px; border-radius: 50%; background: var(--c, var(--muted)); }
+.history time { display: block; font-family: var(--mono); font-size: 12px; color: var(--muted); }
+
+.toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(20px + env(safe-area-inset-bottom, 0px)); background: var(--fg); color: var(--bg); padding: 10px 16px; border-radius: 6px; font-size: 14px; z-index: 60; }
+@media (prefers-reduced-motion: no-preference) { .panel { animation: rise .16s ease-out; } @keyframes rise { from { transform: translateY(8px); opacity: .6; } } }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header class="top">
+    <div>
+      <div class="eyebrow">Compressed gas · orders, stock &amp; returns</div>
+      <h1>Gas Cylinder Log</h1>
+    </div>
+    <div class="top-actions">
+      <button id="backupBtn" type="button">Back up</button><button id="restoreBtn" type="button">Restore</button><input id="restoreFile" type="file" accept=".json,application/json" hidden><button id="exportBtn" type="button" hidden>Export CSV</button>
+      <button id="newOrderBtn" class="primary" type="button">+ New order</button>
+    </div>
+  </header>
+
+  <div id="banner" class="banner" hidden></div>
+
+  <nav class="labs" id="labs" aria-label="Choose lab"></nav>
+
+  <nav class="gauges" id="gauges" aria-label="Filter by status"></nav>
+
+  <div class="bygas" id="bygas"></div>
+
+  <div class="toolbar">
+    <input id="search" class="search" type="search" placeholder="Search gas, serial, supplier, PO, location, person…" aria-label="Search cylinders">
+    <span class="count" id="count"></span>
+  </div>
+
+  <section class="ledger" id="ledger" aria-live="polite">
+    <div class="empty"><h2>Loading cylinders…</h2><p>Loading records saved on this device.</p></div>
+  </section>
+
+  <p class="note">Workflow: <b>On order</b> → <b>In stock</b> (received, serial logged) → <b>In use</b> (connected to a tool) → <b>Return requested</b> → <b>Returned</b> (picked up by supplier). Days on site counts from receipt, for tracking cylinder rental.</p>
+  <p class="note">Records are saved on this device only; they do not sync with other devices. Clearing browser or website data can erase them, so use <b>Back up</b> regularly and store the backup somewhere safe. To install on iPhone, open this app URL in Safari, tap Share, then <b>Add to Home Screen</b>.</p>
+</div>
+
+<div id="overlay" class="overlay" hidden></div>
+<div id="toast" class="toast" hidden></div>
+
+<script>
+(() => {
+  const STATUS = {
+    ordered:          { label: "On order",         c: "var(--ordered)" },
+    in_stock:         { label: "In stock",         c: "var(--stock)" },
+    in_use:           { label: "In use",           c: "var(--use)" },
+    return_requested: { label: "Return requested", c: "var(--req)" },
+    returned:         { label: "Returned",         c: "var(--done)" },
+  };
+  const ORDER = Object.keys(STATUS);
+  const GASES = ["Nitrogen", "Argon", "Helium", "Oxygen", "Hydrogen", "Carbon dioxide", "Compressed air", "Forming gas (N₂/H₂)", "Ar/H₂ mix", "Liquid nitrogen (dewar)", "Acetylene"];
+  const GAS_COLORS = { nitrogen: "#2b2f33", argon: "#2f6b3a", helium: "#8a5a2b", oxygen: "#e8eef0", hydrogen: "#c0392b", "carbon dioxide": "#8c959a", "compressed air": "#3f7fbf", acetylene: "#7a1f3d", forming: "#9a6bc4", "ar/h": "#5e9f6c", liquid: "#6fb7d6" };
+  const SIZES = ["300 (T)", "200 (K)", "80", "Lecture bottle", "160 L dewar", "230 L dewar"];
+  const RETURN_REASONS = ["Empty", "Partly used, no longer needed", "Wrong gas / grade delivered", "Rental cost (demurrage)", "Faulty valve or leak"];
+  const RENTAL_WARN_DAYS = 90;
+  const LABS = ["FAMES", "CREATE", "Deng"];
+
+  let db = null, downloads = null, allRows = [], rows = [], filter = "active", query = "", loaded = false, readOnly = false;
+  let lab = "all"; try { const s = localStorage.getItem("cyl-lab"); if (s === "all" || LABS.includes(s)) lab = s; } catch (e) {}
+  const applyLab = () => { rows = lab === "all" ? allRows : allRows.filter(r => r.lab === lab); };
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const today = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
+  const fmtDate = (d) => d ? new Date(d + (d.length === 10 ? "T12:00:00" : "")).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }) : "";
+  const gasColor = (g) => { const k = (g || "").toLowerCase(); for (const key in GAS_COLORS) if (k.includes(key)) return GAS_COLORS[key]; return "var(--muted)"; };
+  const daysSince = (d) => d ? Math.max(0, Math.floor((Date.now() - new Date(d + "T12:00:00").getTime()) / 86400000)) : null;
+  let myName = ""; try { myName = localStorage.getItem("cyl-name") || ""; } catch (e) {}
+  const rememberName = (n) => { if (!n) return; myName = n; try { localStorage.setItem("cyl-name", n); } catch (e) {} };
+
+  function toast(msg) { const t = $("toast"); t.textContent = msg; t.hidden = false; clearTimeout(toast.t); toast.t = setTimeout(() => t.hidden = true, 2600); }
+
+  /* ---------- render ---------- */
+  function counts() { const c = {}; ORDER.forEach(k => c[k] = 0); rows.forEach(r => c[r.status] = (c[r.status] || 0) + 1); return c; }
+
+  function renderGauges() {
+    const c = counts();
+    const active = rows.filter(r => r.status !== "returned").length;
+    const items = [["active", "All active", active, "var(--accent)"], ...ORDER.map(k => [k, STATUS[k].label, c[k], STATUS[k].c])];
+    // 6 items: show active + 5 statuses; keep grid of 5 by dropping "returned" into its own? keep all six on wide screens
+    $("gauges").style.gridTemplateColumns = "";
+    $("gauges").innerHTML = items.map(([k, l, n, col]) =>
+      `<button type="button" class="gauge" style="--c:${col}" data-f="${k}" aria-pressed="${filter === k}"><span class="n">${n}</span><span class="l">${l}</span></button>`).join("");
+  }
+
+  function renderByGas() {
+    const map = {};
+    rows.forEach(r => { if (r.status === "in_stock" || r.status === "in_use" || r.status === "ordered") { const g = r.gas || "Unspecified"; map[g] = map[g] || { stock: 0, use: 0, ord: 0 }; if (r.status === "in_stock") map[g].stock++; else if (r.status === "in_use") map[g].use++; else map[g].ord++; } });
+    const keys = Object.keys(map).sort();
+    if (!keys.length) { $("bygas").innerHTML = ""; return; }
+    $("bygas").innerHTML = `<span class="lbl">Full spares by gas</span>` + keys.map(g => {
+      const m = map[g]; const low = m.stock === 0;
+      const extra = [m.use ? `${m.use} in use` : "", m.ord ? `${m.ord} on order` : ""].filter(Boolean).join(", ");
+      return `<span class="gaspill ${low ? "low" : ""}" title="${esc(extra)}"><span class="dot" style="--g:${gasColor(g)}"></span>${esc(g)} <b>${m.stock}</b>${low ? " · none spare" : ""}</span>`;
+    }).join("");
+  }
+
+  function keyDate(r) {
+    if (r.status === "ordered") return { k: "Ordered", v: fmtDate(r.orderedAt) + (r.neededBy ? `<div class="sub">Needed by ${fmtDate(r.neededBy)}</div>` : "") };
+    if (r.status === "returned") return { k: "Returned", v: fmtDate(r.returnedAt) };
+    const d = daysSince(r.receivedAt);
+    return { k: "Days on site", v: d == null ? "—" : `<span class="days ${d >= RENTAL_WARN_DAYS ? "warn" : ""}">${d} days</span><div class="sub">since ${fmtDate(r.receivedAt)}</div>` };
+  }
+
+  function condition(r) {
+    if (r.status === "ordered") return null;
+    if (r.status === "in_use") return { k: "use", label: "In use", sub: r.device || r.location || "" };
+    if (r.empty) return { k: "empty", label: "Empty", sub: "" };
+    if (r.opened) return { k: "opened", label: "Opened", sub: "Off device, partly used" };
+    return { k: "intact", label: "Intact", sub: "Full, never connected" };
+  }
+  function condCell(r) {
+    const c = condition(r);
+    if (!c) return '<span class="sub">Not received</span>';
+    return `<span class="cond ${c.k}">${c.label}</span>${c.sub ? `<div class="sub">${esc(c.sub)}</div>` : ""}`;
+  }
+
+  function actionsFor(r) {
+    if (readOnly) return `<button type="button" class="sm ghost" data-a="detail" data-id="${r.id}">Details</button>`;
+    const a = [];
+    if (r.status === "ordered") a.push(["receive", "Mark received", "primary"]);
+    if (r.status === "in_stock") a.push(["use", "Put in use", ""], ["request", "Request return", ""]);
+    if (r.status === "in_use") a.push(["request", "Request return", ""], ["unuse", "Back to stock", "ghost"]);
+    if (r.status === "return_requested") a.push(["returned", "Mark picked up", "primary"]);
+    a.push(["detail", "Details", "ghost"]);
+    return a.map(([k, l, cls]) => `<button type="button" class="sm ${cls}" data-a="${k}" data-id="${r.id}">${l}</button>`).join("");
+  }
+
+  function matches(r) {
+    if (filter === "active" && r.status === "returned") return false;
+    if (filter !== "active" && r.status !== filter) return false;
+    if (!query) return true;
+    const hay = [r.lab, r.gas, r.grade, r.size, r.serial, r.supplier, r.po, r.location, r.device, condition(r)?.label, r.requestedBy, r.returnRequestedBy, r.notes, r.returnReason, STATUS[r.status]?.label].join(" ").toLowerCase();
+    return query.split(/\s+/).every(t => hay.includes(t));
+  }
+
+  function renderLedger() {
+    const el = $("ledger");
+    if (!loaded) return;
+    if (!rows.length) {
+      el.innerHTML = `<div class="empty"><h2>No cylinders logged${lab === "all" ? "" : " for " + esc(lab)} yet</h2><p>Start with <b>New order</b> when you place a gas order. Each cylinder then moves through receiving, use and return here. Already have cylinders in the lab? Add them as an order and mark them received.</p>${readOnly ? "" : `<button type="button" class="primary" data-a="new">+ New order</button>`}</div>`;
+      $("count").textContent = ""; return;
+    }
+    const rank = { return_requested: 0, ordered: 1, in_stock: 2, in_use: 3, returned: 4 };
+    const list = rows.filter(matches).sort((a, b) => (rank[a.status] - rank[b.status]) || String(b.updatedAt || "").localeCompare(String(a.updatedAt || "")));
+    $("count").textContent = `${list.length} of ${rows.length} cylinders`;
+    if (!list.length) { el.innerHTML = `<div class="empty"><h2>Nothing matches</h2><p>Try another status or clear the search.</p></div>`; return; }
+    el.innerHTML = `<div class="row head"><div>Gas</div><div>Serial</div><div>Supplier · PO</div><div>Status · location</div><div>On device?</div><div>Date</div><div></div></div>` +
+      list.map(r => {
+        const s = STATUS[r.status] || STATUS.ordered; const kd = keyDate(r);
+        const statusSub = r.status === "return_requested" ? `${esc(r.returnReason || "")}${r.returnRequestedBy ? " · " + esc(r.returnRequestedBy) : ""}` : esc(r.location || "");
+        return `<div class="row">
+          <div class="cell gascell"><div class="gas"><span class="dot" style="--g:${gasColor(r.gas)}"></span><div><div class="name">${esc(r.gas)}${lab === "all" ? `<span class="labtag">${esc(r.lab || "No lab")}</span>` : ""}</div><div class="sub">${esc([r.grade, r.size].filter(Boolean).join(" · "))}</div></div></div></div>
+          <div class="cell"><span class="k">Serial</span><span class="mono">${r.serial ? esc(r.serial) : '<span class="sub">not yet received</span>'}</span></div>
+          <div class="cell"><span class="k">Supplier · PO</span>${esc(r.supplier || "—")}<div class="sub mono">${esc(r.po || "")}</div></div>
+          <div class="cell"><span class="k">Status</span><span class="status" style="--c:${s.c}">${s.label}</span><div class="sub">${statusSub}</div></div>
+          <div class="cell"><span class="k">On device?</span>${condCell(r)}</div>
+          <div class="cell"><span class="k">${kd.k}</span>${kd.v}</div>
+          <div class="cell acts">${actionsFor(r)}</div>
+        </div>`;
+      }).join("");
+  }
+
+  function renderLabs() {
+    const n = (l) => allRows.filter(r => r.status !== "returned" && (l === "all" || r.lab === l)).length;
+    $("labs").innerHTML = [["all", "All labs"], ...LABS.map(l => [l, l])].map(([k, l]) =>
+      `<button type="button" class="labtab" data-lab="${k}" aria-pressed="${lab === k}">${l}<small>${n(k)}</small></button>`).join("");
+  }
+
+  function render() { applyLab(); renderLabs(); renderGauges(); renderByGas(); renderLedger(); $("exportBtn").hidden = !(downloads && rows.length); }
+
+  /* ---------- panel ---------- */
+  function field(f) {
+    const id = "f_" + f.name; const full = f.full ? " full" : "";
+    let input;
+    if (f.type === "select") input = `<select id="${id}" name="${f.name}">${f.options.map(o => `<option ${o === f.value ? "selected" : ""}>${esc(o)}</option>`).join("")}</select>`;
+    else if (f.type === "textarea") input = `<textarea id="${id}" name="${f.name}" placeholder="${esc(f.ph || "")}">${esc(f.value || "")}</textarea>`;
+    else input = `<input id="${id}" name="${f.name}" type="${f.type || "text"}" value="${esc(f.value ?? "")}" placeholder="${esc(f.ph || "")}" ${f.list ? `list="${id}_l"` : ""} ${f.min != null ? `min="${f.min}"` : ""} ${f.max != null ? `max="${f.max}"` : ""} ${f.required ? "required" : ""}>${f.list ? `<datalist id="${id}_l">${f.list.map(o => `<option value="${esc(o)}">`).join("")}</datalist>` : ""}`;
+    return `<div class="field${full}"><label for="${id}">${esc(f.label)}${f.required ? " *" : ""}</label>${input}</div>`;
+  }
+
+  function openPanel({ title, lead, fields, submit, onSubmit, extra = "", danger }) {
+    const ov = $("overlay");
+    ov.innerHTML = `<form class="panel" role="dialog" aria-modal="true" aria-label="${esc(title)}" novalidate>
+      <h2>${esc(title)}</h2>${lead ? `<p class="lead">${lead}</p>` : ""}
+      ${fields && fields.length ? `<div class="fields">${fields.map(field).join("")}</div>` : ""}
+      ${extra}
+      <div class="err" id="perr" hidden></div>
+      <div class="foot">${danger ? `<button type="button" class="danger" data-p="danger" style="margin-right:auto">${esc(danger.label)}</button>` : ""}<button type="button" data-p="cancel">${submit ? "Cancel" : "Close"}</button>${submit ? `<button type="submit" class="primary">${esc(submit)}</button>` : ""}</div>
+    </form>`;
+    ov.hidden = false;
+    const form = ov.querySelector("form");
+    const first = form.querySelector("input, select, textarea"); if (first) first.focus();
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const data = Object.fromEntries(new FormData(form).entries());
+      for (const f of fields || []) if (f.required && !String(data[f.name] || "").trim()) { showErr(`${f.label} is required.`); form.querySelector(`[name="${f.name}"]`).focus(); return; }
+      const btn = form.querySelector("button[type=submit]"); btn.disabled = true;
+      try { await onSubmit(data); closePanel(); }
+      catch (err) { btn.disabled = false; showErr(errText(err)); }
+    });
+    form.querySelector('[data-p="cancel"]').addEventListener("click", closePanel);
+    if (danger) {
+      const db1 = form.querySelector('[data-p="danger"]');
+      db1.addEventListener("click", async () => {
+        if (!db1.dataset.armed) { db1.dataset.armed = "1"; db1.textContent = danger.confirm; return; }
+        db1.disabled = true;
+        try { await danger.run(); closePanel(); } catch (err) { db1.disabled = false; showErr(errText(err)); }
+      });
+    }
+  }
+  function showErr(m) { const e = $("perr"); if (e) { e.textContent = m; e.hidden = false; } }
+  function closePanel() { $("overlay").hidden = true; $("overlay").innerHTML = ""; }
+  $("overlay").addEventListener("click", (e) => { if (e.target.id === "overlay") closePanel(); });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !$("overlay").hidden) closePanel(); });
+
+  function errText(err) {
+    const c = err && err.code;
+    if (c === "invalid_argument") { readOnly = true; render(); return "You have view-only access to this log, so changes can't be saved. Ask the owner for Contributor access."; }
+    if (c === "quota_exceeded") return "The log is full. Delete some old returned cylinders, then try again.";
+    return "Couldn't save. The browser's storage may be full or blocked. Make a backup, then try again.";
+  }
+
+  const hist = (r, status, note) => [...(r?.history || []), { status, at: new Date().toISOString(), by: myName || "", note: note || "" }];
+
+  async function save(id, patch, histEntry) {
+    if (!db) throw {};
+    const r = rows.find(x => x.id === id);
+    const body = { ...patch, updatedAt: new Date().toISOString() };
+    if (histEntry) body.history = hist(r, histEntry.status, histEntry.note);
+    await db.doc("cylinders/" + id).update(body);
+  }
+
+  /* ---------- actions ---------- */
+  function newOrder() {
+    openPanel({
+      title: "New gas order", lead: "Each cylinder in the order gets its own line so it can be received and returned on its own.",
+      submit: "Log order",
+      fields: [
+        { name: "lab", label: "Lab", type: "select", options: LABS, value: lab === "all" ? LABS[0] : lab, full: true },
+        { name: "gas", label: "Gas", list: GASES, required: true, ph: "e.g. Nitrogen" },
+        { name: "grade", label: "Grade / purity", ph: "e.g. UHP 5.0, 99.999%" },
+        { name: "size", label: "Cylinder size", list: SIZES, ph: "e.g. 300 (T)" },
+        { name: "qty", label: "Quantity", type: "number", value: 1, min: 1, max: 20, required: true },
+        { name: "supplier", label: "Supplier", ph: "e.g. Airgas" },
+        { name: "po", label: "PO / order number" },
+        { name: "orderedAt", label: "Order date", type: "date", value: today(), required: true },
+        { name: "neededBy", label: "Needed by", type: "date" },
+        { name: "requestedBy", label: "Ordered by", value: myName, full: true, required: true },
+        { name: "notes", label: "Notes", type: "textarea", full: true, ph: "Regulator, CGA fitting, tool it's for…" },
+      ],
+      onSubmit: async (d) => {
+        if (!db) throw {};
+        rememberName(d.requestedBy.trim());
+        const qty = Math.min(20, Math.max(1, parseInt(d.qty, 10) || 1));
+        const now = new Date().toISOString();
+        const base = { lab: d.lab, gas: d.gas.trim(), grade: d.grade.trim(), size: d.size.trim(), supplier: d.supplier.trim(), po: d.po.trim(), orderedAt: d.orderedAt, neededBy: d.neededBy || "", requestedBy: d.requestedBy.trim(), notes: d.notes.trim(), status: "ordered", serial: "", location: "", createdAt: now, updatedAt: now, history: [{ status: "ordered", at: now, by: d.requestedBy.trim(), note: d.po ? "PO " + d.po.trim() : "" }] };
+        for (let i = 0; i < qty; i++) await db.collection("cylinders").add({ ...base });
+        toast(qty > 1 ? `Logged ${qty} cylinders on order for ${d.lab}` : `Order logged for ${d.lab}`);
+      },
+    });
+  }
+
+  function receive(r) {
+    openPanel({
+      title: "Mark received", lead: `${esc(r.gas)} ${esc(r.size || "")} — log the serial stamped on the cylinder.`,
+      submit: "Mark in stock",
+      fields: [
+        { name: "serial", label: "Cylinder serial number", required: true, full: true },
+        { name: "receivedAt", label: "Date received", type: "date", value: today(), required: true },
+        { name: "location", label: "Storage location", ph: "e.g. Gas cabinet B", value: r.location },
+        { name: "by", label: "Received by", value: myName, full: true },
+      ],
+      onSubmit: async (d) => { rememberName(d.by.trim()); await save(r.id, { status: "in_stock", serial: d.serial.trim(), receivedAt: d.receivedAt, location: d.location.trim() }, { status: "in_stock", note: "Serial " + d.serial.trim() }); toast("Marked in stock"); },
+    });
+  }
+
+  function putInUse(r) {
+    openPanel({
+      title: "Put in use", lead: `${esc(r.gas)} · <span class="mono">${esc(r.serial)}</span>`,
+      submit: "Mark in use",
+      fields: [
+        { name: "device", label: "Connected to which device", value: r.device, required: true, full: true, ph: "e.g. Probe station, glovebox, sputter tool" },
+        { name: "location", label: "Room / location", value: r.location, ph: "e.g. Room 073" },
+        { name: "by", label: "Your name", value: myName, full: true },
+      ],
+      onSubmit: async (d) => { rememberName(d.by.trim()); await save(r.id, { status: "in_use", device: d.device.trim(), location: d.location.trim(), opened: true, inUseAt: today() }, { status: "in_use", note: "On " + d.device.trim() }); toast("Marked in use"); },
+    });
+  }
+
+  function requestReturn(r) {
+    openPanel({
+      title: "Request return", lead: `${esc(r.gas)} · <span class="mono">${esc(r.serial || "")}</span> — flags this cylinder for supplier pickup.`,
+      submit: "Request return",
+      fields: [
+        { name: "reason", label: "Reason", type: "select", options: RETURN_REASONS, full: true },
+        { name: "by", label: "Requested by", value: myName, required: true },
+        { name: "location", label: "Where it's waiting", value: r.location, ph: "e.g. Loading dock rack" },
+        { name: "note", label: "Notes", type: "textarea", full: true, ph: "Remaining pressure, valve condition…" },
+      ],
+      onSubmit: async (d) => { rememberName(d.by.trim()); await save(r.id, { status: "return_requested", returnReason: d.reason, returnRequestedBy: d.by.trim(), returnRequestedAt: today(), location: d.location.trim(), returnNote: d.note.trim(), device: "", empty: d.reason === "Empty", opened: r.opened || d.reason === "Empty" || d.reason.startsWith("Partly") }, { status: "return_requested", note: d.reason + (d.note ? " — " + d.note.trim() : "") }); toast("Return requested"); },
+    });
+  }
+
+  function markReturned(r) {
+    openPanel({
+      title: "Mark picked up", lead: `${esc(r.gas)} · <span class="mono">${esc(r.serial || "")}</span> — the supplier has taken it back.`,
+      submit: "Mark returned",
+      fields: [
+        { name: "returnedAt", label: "Pickup date", type: "date", value: today(), required: true },
+        { name: "rma", label: "Return slip / ticket no." },
+        { name: "by", label: "Handled by", value: myName, full: true },
+      ],
+      onSubmit: async (d) => { rememberName(d.by.trim()); await save(r.id, { status: "returned", returnedAt: d.returnedAt, returnTicket: d.rma.trim(), location: "" }, { status: "returned", note: d.rma ? "Ticket " + d.rma.trim() : "" }); toast("Marked returned"); },
+    });
+  }
+
+  async function backToStock(r) {
+    try { await save(r.id, { status: "in_stock", device: "", opened: true }, { status: "in_stock", note: "Disconnected from " + (r.device || "device") + ", back to storage" }); toast("Moved back to stock"); }
+    catch (err) { toast(errText(err)); }
+  }
+
+  function details(r) {
+    const s = STATUS[r.status];
+    const histHtml = (r.history || []).slice().reverse().map(h => `<div style="--c:${(STATUS[h.status] || s).c}"><b>${esc((STATUS[h.status] || {}).label || h.status)}</b>${h.by ? " · " + esc(h.by) : ""}${h.note ? `<div class="sub">${esc(h.note)}</div>` : ""}<time>${new Date(h.at).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}</time></div>`).join("");
+    const editable = !readOnly;
+    openPanel({
+      title: `${r.gas}${r.serial ? " · " + r.serial : ""}`, lead: `<span class="status" style="--c:${s.c}">${s.label}</span>`,
+      submit: editable ? "Save changes" : null,
+      fields: editable ? [
+        { name: "lab", label: "Lab", type: "select", options: LABS, value: r.lab, full: true },
+        { name: "gas", label: "Gas", value: r.gas, list: GASES, required: true },
+        { name: "grade", label: "Grade / purity", value: r.grade },
+        { name: "size", label: "Cylinder size", value: r.size, list: SIZES },
+        { name: "serial", label: "Serial number", value: r.serial },
+        { name: "supplier", label: "Supplier", value: r.supplier },
+        { name: "po", label: "PO / order number", value: r.po },
+        { name: "location", label: "Location", value: r.location },
+        { name: "device", label: "Connected device", value: r.device },
+        { name: "state", label: "Cylinder state", type: "select", options: ["Intact (full)", "Opened (partly used)", "Empty"], value: r.empty ? "Empty" : r.opened ? "Opened (partly used)" : "Intact (full)" },
+        { name: "receivedAt", label: "Date received", type: "date", value: r.receivedAt || "" },
+        { name: "notes", label: "Notes", type: "textarea", value: r.notes, full: true },
+      ] : [],
+      extra: `<div class="field full"><label>History</label><div class="history">${histHtml || '<div class="sub">No history yet.</div>'}</div></div>`,
+      onSubmit: async (d) => { await save(r.id, { lab: d.lab, gas: d.gas.trim(), grade: d.grade.trim(), size: d.size.trim(), serial: d.serial.trim(), supplier: d.supplier.trim(), po: d.po.trim(), location: d.location.trim(), device: d.device.trim(), opened: d.state !== "Intact (full)", empty: d.state === "Empty", receivedAt: d.receivedAt, notes: d.notes.trim() }); toast("Saved"); },
+      danger: editable ? { label: "Delete entry", confirm: "Click again to delete", run: async () => { await db.doc("cylinders/" + r.id).delete(); toast("Deleted"); } } : null,
+    });
+  }
+
+  async function exportCsv() {
+    const cols = ["lab", "gas", "grade", "size", "serial", "status", "supplier", "po", "location", "device", "condition", "requestedBy", "orderedAt", "neededBy", "receivedAt", "returnRequestedAt", "returnRequestedBy", "returnReason", "returnedAt", "returnTicket", "notes"];
+    const q = (v) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+    const lines = [cols.join(",")].concat(rows.map(r => cols.map(c => q(c === "status" ? STATUS[r.status]?.label : c === "condition" ? (condition(r)?.label || "") : r[c])).join(",")));
+    try { await downloads.save({ filename: `gas-cylinders-${lab === "all" ? "all-labs" : lab}-${today()}.csv`, data: lines.join("\n") }); }
+    catch (e) { toast("Export cancelled"); }
+  }
+
+  /* ---------- events ---------- */
+  $("newOrderBtn").addEventListener("click", newOrder);
+  $("exportBtn").addEventListener("click", exportCsv);
+  $("search").addEventListener("input", (e) => { query = e.target.value.trim().toLowerCase(); renderLedger(); });
+  $("labs").addEventListener("click", (e) => { const b = e.target.closest("[data-lab]"); if (!b) return; lab = b.dataset.lab; try { localStorage.setItem("cyl-lab", lab); } catch (er) {} render(); });
+  $("gauges").addEventListener("click", (e) => { const b = e.target.closest("[data-f]"); if (!b) return; filter = (filter === b.dataset.f && b.dataset.f !== "active") ? "active" : b.dataset.f; render(); });
+  document.addEventListener("click", (e) => {
+    const b = e.target.closest("[data-a]"); if (!b) return;
+    if (b.dataset.a === "new") return newOrder();
+    const r = rows.find(x => x.id === b.dataset.id); if (!r) return;
+    ({ receive, use: putInUse, request: requestReturn, returned: markReturned, unuse: backToStock, detail: details })[b.dataset.a]?.(r);
+  });
+
+  /* ---------- local storage (offline) ---------- */
+  const KEY = "gas-cylinder-log-v1";
+  let store = {}; let listener = null;
+  function loadStore() { try { store = JSON.parse(localStorage.getItem(KEY) || "{}") || {}; } catch (e) { store = {}; } }
+  function persist() {
+    try { localStorage.setItem(KEY, JSON.stringify(store)); }
+    catch (e) { const er = new Error("save failed"); er.code = "storage"; throw er; }
+    emit();
+  }
+  function emit() { if (listener) listener({ docs: Object.keys(store).map(id => ({ id, data: () => store[id] })), metadata: { fromCache: false } }); }
+  const newId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+  db = {
+    collection: () => ({
+      add: async (data) => { store[newId()] = JSON.parse(JSON.stringify(data)); persist(); },
+      onSnapshot: (fn) => { listener = fn; emit(); return () => { listener = null; }; },
+    }),
+    doc: (path) => { const id = path.split("/")[1]; return {
+      update: async (patch) => { if (!store[id]) throw new Error("missing"); store[id] = { ...store[id], ...JSON.parse(JSON.stringify(patch)) }; persist(); },
+      delete: async () => { delete store[id]; persist(); },
+    }; },
+  };
+  function saveFile(name, text, type) {
+    const blob = new Blob([text], { type }); const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click();
+    setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+  }
+  downloads = { save: async ({ filename, data }) => saveFile(filename, data, "text/csv") };
+
+  $("backupBtn").addEventListener("click", () => {
+    saveFile(`gas-cylinder-backup-${today()}.json`, JSON.stringify({ app: "Gas Cylinder Log", exportedAt: new Date().toISOString(), cylinders: store }, null, 1), "application/json");
+    try { localStorage.setItem(KEY + "-lastBackup", today()); } catch (e) {}
+    toast("Backup saved to your Downloads folder");
+  });
+  $("restoreBtn").addEventListener("click", () => $("restoreFile").click());
+  $("restoreFile").addEventListener("change", async (e) => {
+    const f = e.target.files[0]; e.target.value = ""; if (!f) return;
+    let data; try { data = JSON.parse(await f.text()); } catch (er) { toast("That file isn't a cylinder log backup."); return; }
+    const cyl = data && data.cylinders; if (!cyl || typeof cyl !== "object") { toast("That file isn't a cylinder log backup."); return; }
+    const n = Object.keys(cyl).length;
+    openPanel({ title: "Restore backup", lead: `The backup from ${esc(fmtDate((data.exportedAt || "").slice(0, 10)) || "an earlier date")} has ${n} cylinders. Restoring replaces everything currently in this log.`, submit: "Replace with backup", fields: [],
+      onSubmit: async () => { store = cyl; persist(); toast(`Restored ${n} cylinders`); } });
+  });
+
+  if ("serviceWorker" in navigator) window.addEventListener("load", () => navigator.serviceWorker.register("./service-worker.js").catch(() => {}));
+
+  loadStore();
+  db.collection("cylinders").onSnapshot((snap) => { allRows = snap.docs.map(d => ({ id: d.id, ...d.data() })); loaded = true; render(); });
+})();
+</script>
+</body>
+</html>
