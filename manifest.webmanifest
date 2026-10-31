@@ -1,24 +1,14 @@
 {
-  "name": "Gas Cylinder Log",
-  "short_name": "Cylinder Log",
-  "description": "Track compressed gas orders, stock, use, and returns.",
+  "name": "Airgas Orders",
+  "short_name": "Airgas Orders",
+  "description": "Track gas cylinder orders, existing stock, use, and returns across FAMES, CREATE, and Deng.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
   "background_color": "#f2f4f5",
   "theme_color": "#0d5f73",
   "icons": [
-    {
-      "src": "icon-192.png",
-      "sizes": "192x192",
-      "type": "image/png",
-      "purpose": "any"
-    },
-    {
-      "src": "icon-512.png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "any maskable"
-    }
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
   ]
 }
